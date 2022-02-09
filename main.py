@@ -2,13 +2,14 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import threading
+import datetime
 
 #way to make unique training data for each thread
 def worker_train(W1, b1, W2, b2, X, Y, alpha, iterations, lock): #training on threads
-    for i in range(iterations):
-        Z1, A1, Z2, A2 = forward_prop(W1, b1, W2, b2, X)
+    for _ in range(iterations):
+        Z1, A1, Z2, A2     = forward_prop(W1, b1, W2, b2, X)
         dW1, db1, dW2, db2 = backward_prop(Z1, A1, Z2, A2, W1, W2, X, Y)
-        W1, b1, W2, b2 = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
+        W1, b1, W2, b2     = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
 
     predictions = get_predictions(A2)
     #write results to central location (for aggregation)
@@ -16,7 +17,7 @@ def worker_train(W1, b1, W2, b2, X, Y, alpha, iterations, lock): #training on th
         global weights_and_biases
         global accuracies
         accuracy = get_accuracy(predictions, Y)
-#         print(f"\t{accuracy} after {iterations} iterations")
+        print(f"\t\t\t{accuracy} after {iterations} iterations", flush=True)
         weights_and_biases.append((W1, b1, W2, b2)) #append weights and biases tuple
         accuracies.append(accuracy)
 
@@ -51,25 +52,24 @@ def start_workers(workers):
         worker.join()
 
 def split_data(data):    
-    le_split = int(data.shape[0]/np.random.randint(2,high=16))
-    data_test = data[0:le_split].T
+    le_split   = int(data.shape[0]/np.random.randint(2,high=16))
+    data_test  = data[0:le_split].T
     data_train = data[le_split:]
-    
     return data_test, data_train
         
 def create_workers(data_train, num_workers, params):
     W1, b1, W2, b2 = params
-    m, n = data_train.shape
+    m, n           = data_train.shape
     
     le_split = int(m/np.random.randint(2,high=16))
     
-    workers    = []
+    workers    = list()
     lock       = threading.Lock()
     data_reset = np.copy(data_train)
     
     for _ in range(num_workers):
         alpha        = np.random.random_sample()#np.random.randint(0.1,high=0.5)
-        k_iterations = np.random.randint(500, high=1500)
+        k_iterations = np.random.randint(1000, high=1500)
         data_train   = data_reset[le_split:]
         np.random.shuffle(data_train)
 
@@ -86,7 +86,6 @@ def create_workers(data_train, num_workers, params):
     
     return workers
     
-
 def read_data(filename):
     data = pd.read_csv(filename)
     data = np.array(data)
@@ -138,20 +137,20 @@ def ReLU_deriv(Z):
     return Z > 0
 
 def one_hot(Y):
-    one_hot_Y = np.zeros((Y.size, Y.max() + 1))
+    one_hot_Y                       = np.zeros((Y.size, Y.max() + 1))
     one_hot_Y[np.arange(Y.size), Y] = 1
-    one_hot_Y = one_hot_Y.T
+    one_hot_Y                       = one_hot_Y.T
     return one_hot_Y
 
 def backward_prop(Z1, A1, Z2, A2, W1, W2, X, Y):
-    m = Y.size
+    m         = Y.size
     one_hot_Y = one_hot(Y)
-    dZ2 = A2 - one_hot_Y
-    dW2 = 1 / m * dZ2.dot(A1.T)
-    db2 = 1 / m * np.sum(dZ2)
-    dZ1 = W2.T.dot(dZ2) * ReLU_deriv(Z1)
-    dW1 = 1 / m * dZ1.dot(X.T)
-    db1 = 1 / m * np.sum(dZ1)
+    dZ2       = A2 - one_hot_Y
+    dW2       = 1 / m * dZ2.dot(A1.T)
+    db2       = 1 / m * np.sum(dZ2)
+    dZ1       = W2.T.dot(dZ2) * ReLU_deriv(Z1)
+    dW1       = 1 / m * dZ1.dot(X.T)
+    db1       = 1 / m * np.sum(dZ1)
     return dW1, db1, dW2, db2
 
 def update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha):
@@ -165,21 +164,20 @@ def get_predictions(A2):
     return np.argmax(A2, 0)
 
 def get_accuracy(predictions, Y):
-#     print(predictions, Y)
+    # print(predictions, Y)
     return np.sum(predictions == Y) / Y.size
 
 def gradient_descent(X, Y, params, alpha, iterations):
     W1, b1, W2, b2 = params
-    for i in range(iterations):
-        Z1, A1, Z2, A2 = forward_prop(W1, b1, W2, b2, X)
+    for _ in range(iterations):
+        Z1, A1, Z2, A2     = forward_prop(W1, b1, W2, b2, X)
         dW1, db1, dW2, db2 = backward_prop(Z1, A1, Z2, A2, W1, W2, X, Y)
-        W1, b1, W2, b2 = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
-#         if i % 10 == 0:
-    predictions = get_predictions(A2)
-#             print(f"Iteration: {i}\n{get_accuracy(predictions, Y)}")
-#             print(get_accuracy(predictions, Y))
+        W1, b1, W2, b2     = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
+    predictions            = get_predictions(A2)
+    #         print(f"Iteration: {i}\n{get_accuracy(predictions, Y)}")
+    #         print(get_accuracy(predictions, Y))
     accuracy = get_accuracy(predictions, Y)
-#     print(f"{accuracy} after {iterations} iterations")
+    print(f"\t\t{accuracy} after {iterations} iterations", flush=True)
 
     return W1, b1, W2, b2
 
@@ -190,8 +188,8 @@ def make_predictions(X, W1, b1, W2, b2):
 
 def test_prediction(index, W1, b1, W2, b2):
     current_image = X_train[:, index, None]
-    prediction = make_predictions(X_train[:, index, None], W1, b1, W2, b2)
-    label = Y_train[index]
+    prediction    = make_predictions(X_train[:, index, None], W1, b1, W2, b2)
+    label         = Y_train[index]
     print("Prediction: ", prediction)
     print("Label: ", label)
     
@@ -200,31 +198,31 @@ def test_prediction(index, W1, b1, W2, b2):
     plt.imshow(current_image, interpolation='nearest')
     plt.show()
 
-weights_and_biases,accuracies = list(),list()
-
 #FL
+weights_and_biases,accuracies = list(),list()
 def run_federated_learning(d_test, d_train, W1, b1, W2, b2):
-    for j in range(10):
+    for _ in range(10):
         global weights_and_biases 
         global accuracies
         weights_and_biases,accuracies = list(),list()
-#         workers = create_workers(d_train, 5, (W1, b1, W2, b2))
+        # workers = create_workers(d_train, 5, (W1, b1, W2, b2))
         workers = create_workers(d_train, np.random.randint(5,high=15), (W1, b1, W2, b2))
+        print(f"\t\tCreated {len(workers)} workers", flush=True)
         start_workers(workers)
         W1, b1, W2, b2 = aggregate_params(weights_and_biases,accuracies)
-    #     print(f"Updated params [iteration {j}]:\n",W1, b1, W2, b2)
-    #     print(f"Updated params [iteration {j}]:\n",b1)
-#         print(f"Iteration {j} complete...")
+        # print(f"Updated params [iteration {j}]:\n",W1, b1, W2, b2)
+        # print(f"Updated params [iteration {j}]:\n",b1)
+        # print(f"Iteration {j} complete...")
 
     Y_test = d_test[0]
     X_test = d_test[1:d_test.shape[1]]
     X_test = X_test / 255.
 
 
-#     print("Predictions")
+    # print("Predictions")
     dev_predictions = make_predictions(X_test, W1, b1, W2, b2)
-    test_accuracy = get_accuracy(dev_predictions, Y_test)
-#     print(test_accuracy)
+    test_accuracy   = get_accuracy(dev_predictions, Y_test)
+    # print(test_accuracy)
     return test_accuracy
 
 #Centralized
@@ -232,9 +230,9 @@ def run_centralized_learning(d_test, d_train, W1, b1, W2, b2):
     data_reset = np.copy(d_train)
     m, n       = d_train.shape
 
-    for i in range(10):
+    for _ in range(10):
         alpha        = np.random.random_sample()
-        k_iterations = np.random.randint(500, high=1500)
+        k_iterations = np.random.randint(1000, high=1500)
         le_split     = int(m/np.random.randint(2,high=16))
         data_train   = data_reset[le_split:]
         np.random.shuffle(data_train)
@@ -245,37 +243,39 @@ def run_centralized_learning(d_test, d_train, W1, b1, W2, b2):
         X_train    = X_train / 255.
 
         W1, b1, W2, b2 = gradient_descent(X_train, Y_train, (W1, b1, W2, b2), alpha, k_iterations)
-#         print(f"Iteration {i} complete...")
+        # print(f"Iteration {i} complete...")
 
 
     Y_test = d_test[0]
     X_test = d_test[1:d_test.shape[1]]
     X_test = X_test / 255.
 
-#     print("Predictions")
+    # print("Predictions")
     dev_predictions = make_predictions(X_test, W1, b1, W2, b2)
     test_accuracy   = get_accuracy(dev_predictions, Y_test)
-#     print(test_accuracy)
+    # print(test_accuracy)
     return test_accuracy
+
 if __name__ == "__main__":
+    run_time                             = datetime.datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
     centralized_accuracies,fl_accuracies = list(),list()
-    for epoch in range(15):
-        print(f"TESTING ITERATION {epoch} START\n")
-        d = read_data("./train.csv")
-        W1, b1, W2, b2 = init_params()
+    for epoch in range(2):
+        print(f"TESTING ITERATION {epoch} START", flush=True)
+        d               = read_data("./train.csv")
+        W1, b1, W2, b2  = init_params()
         d_test, d_train = split_data(d)
 
-        print("\tCentralized training start")
+        print("\tCentralized training start", flush=True)
         cl_accuracy = run_centralized_learning(d_test, d_train, np.copy(W1), np.copy(b1), np.copy(W2), np.copy(b2))
-        print("\tCentralized training end")
+        print("\tCentralized training end", flush=True)
 
-        print("\tFL training start")
+        print("\tFL training start", flush=True)
         fl_accuracy = run_federated_learning(d_test, d_train, np.copy(W1), np.copy(b1), np.copy(W2), np.copy(b2))
-        print("\tFL training end")
+        print("\tFL training end", flush=True)
         
         centralized_accuracies.append(cl_accuracy)
         fl_accuracies.append(fl_accuracy)
-        print(f"TESTING ITERATION {epoch} END\n")
+        print(f"TESTING ITERATION {epoch} END\n", flush=True)
         
     cl = np.array(centralized_accuracies)
     fl = np.array(fl_accuracies)
@@ -283,6 +283,16 @@ if __name__ == "__main__":
     cl = np.insert(cl,0,0)
     fl = np.insert(fl,0,0)
     x  = np.arange(fl.size)
+
+    with open(f"cl_vs_fl_{run_time}.txt", "w") as f:
+        f.write("Centralized Learning accuracies:\n")
+        for value in cl:
+            f.write(f"{value}\n")
+        
+        f.write("\nFederated Learning accuracies:\n")
+        for value in fl:
+            f.write(f"{value}\n")
+    
 
     plt.xlabel("Iteration")
     plt.ylabel("Accuracy")
